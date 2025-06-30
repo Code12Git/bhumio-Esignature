@@ -1,24 +1,27 @@
 import {
   Controller,
+  Get,
+  Param,
   Post,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { PdfService } from './pdf.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
+import { join } from 'path';
+import { Response } from 'express';
 
-@Controller('pdf') //this is used for making routes like /pdf
+@Controller('pdf')
 export class PdfController {
-  constructor(private readonly pdfService: PdfService) {} // this is used for inject PdfService which we make in pdf.service.ts
+  constructor(private readonly pdfService: PdfService) {}
 
-  @Post('upload') // this is used for making post request like /pdf/upload POST
+  @Post('upload')
   @UseInterceptors(
-    //used for file uploading
     FileInterceptor('file', {
       storage: diskStorage({
-        // FileInterceptor grabs the file from the file field in the request.
-        destination: './uploads', //files are saved in upload folder
+        destination: './uploads',
         filename: (req, file, cb) => {
           const uniqueName = `${Date.now()}-${file.originalname}`;
           cb(null, uniqueName);
@@ -27,6 +30,25 @@ export class PdfController {
     }),
   )
   uploadFile(@UploadedFile() file: Express.Multer.File) {
-    return this.pdfService.handleUpload(file); //initializing the class or accessing method in class
+    try {
+      const result = this.pdfService.handleUpload(file);
+      return result;
+    } catch (error) {
+      throw new Error('File upload failed', error);
+    }
+  }
+
+  @Get('/preview/:filename')
+  previewPdf(@Param('filename') filename: string, @Res() res: Response) {
+    try {
+      const filePath = join(process.cwd(), 'uploads', filename);
+      return res.sendFile(filePath, (err) => {
+        if (err) {
+          res.status(404).send('File not found');
+        }
+      });
+    } catch (error) {
+      throw new Error('File preview failed', error);
+    }
   }
 }
